@@ -5,7 +5,6 @@
  */
 
 import { useCallback, useRef } from 'react';
-import { SCROLL_SYNC_DEBOUNCE } from '../constants';
 
 /**
  * 滚动同步 Hook 配置
@@ -59,8 +58,10 @@ interface UseScrollSyncReturn {
  * 使用防抖机制避免循环触发和性能问题
  * Uses debounce mechanism to avoid circular triggers and performance issues
  *
- * TODO: 考虑使用 requestAnimationFrame 替代 setTimeout 以提升性能
- * TODO: Consider using requestAnimationFrame instead of setTimeout for better performance
+ * 使用 requestAnimationFrame 将 DOM 写操作与浏览器渲染周期对齐，
+ * 并通过双 rAF 模式在帧绘制完成后重置同步标志
+ * Uses requestAnimationFrame to align DOM writes with the browser render cycle,
+ * and a double-rAF pattern to reset the sync flag after the frame is painted
  *
  * @param options - 滚动同步配置 / Scroll sync configuration
  * @returns 滚动事件处理函数 / Scroll event handlers
@@ -73,21 +74,26 @@ export const useScrollSync = ({ enabled, editorContainerRef, previewContainerRef
       if (!enabled || isSyncingRef.current) return;
 
       isSyncingRef.current = true;
-      const previewContainer = previewContainerRef.current;
       const scrollPercentage = scrollTop / (scrollHeight - clientHeight || 1);
-      if (previewContainer) {
-        // 使用 data 属性传递目标滚动百分比，由各组件自行处理
-        // Use data attribute to pass target scroll percentage, each component handles it
-        previewContainer.dataset.targetScrollPercent = String(scrollPercentage);
-        // 同时尝试直接设置 scrollTop（对于支持的组件）
-        // Also try to set scrollTop directly (for components that support it)
-        const targetScroll = scrollPercentage * (previewContainer.scrollHeight - previewContainer.clientHeight);
-        previewContainer.scrollTop = targetScroll;
-      }
 
-      setTimeout(() => {
-        isSyncingRef.current = false;
-      }, SCROLL_SYNC_DEBOUNCE);
+      requestAnimationFrame(() => {
+        const previewContainer = previewContainerRef.current;
+        if (previewContainer) {
+          // 使用 data 属性传递目标滚动百分比，由各组件自行处理
+          // Use data attribute to pass target scroll percentage, each component handles it
+          previewContainer.dataset.targetScrollPercent = String(scrollPercentage);
+          // 同时尝试直接设置 scrollTop（对于支持的组件）
+          // Also try to set scrollTop directly (for components that support it)
+          const targetScroll = scrollPercentage * (previewContainer.scrollHeight - previewContainer.clientHeight);
+          previewContainer.scrollTop = targetScroll;
+        }
+
+        // 在下一帧绘制完成后重置同步标志，确保程序化滚动事件已分发
+        // Reset sync flag after the next frame is painted, ensuring programmatic scroll events have dispatched
+        requestAnimationFrame(() => {
+          isSyncingRef.current = false;
+        });
+      });
     },
     [enabled, previewContainerRef]
   );
@@ -97,21 +103,26 @@ export const useScrollSync = ({ enabled, editorContainerRef, previewContainerRef
       if (!enabled || isSyncingRef.current) return;
 
       isSyncingRef.current = true;
-      const editorContainer = editorContainerRef.current;
       const scrollPercentage = scrollTop / (scrollHeight - clientHeight || 1);
-      if (editorContainer) {
-        // 使用 data 属性传递目标滚动百分比，由各组件自行处理
-        // Use data attribute to pass target scroll percentage, each component handles it
-        editorContainer.dataset.targetScrollPercent = String(scrollPercentage);
-        // 同时尝试直接设置 scrollTop（对于支持的组件）
-        // Also try to set scrollTop directly (for components that support it)
-        const targetScroll = scrollPercentage * (editorContainer.scrollHeight - editorContainer.clientHeight);
-        editorContainer.scrollTop = targetScroll;
-      }
 
-      setTimeout(() => {
-        isSyncingRef.current = false;
-      }, SCROLL_SYNC_DEBOUNCE);
+      requestAnimationFrame(() => {
+        const editorContainer = editorContainerRef.current;
+        if (editorContainer) {
+          // 使用 data 属性传递目标滚动百分比，由各组件自行处理
+          // Use data attribute to pass target scroll percentage, each component handles it
+          editorContainer.dataset.targetScrollPercent = String(scrollPercentage);
+          // 同时尝试直接设置 scrollTop（对于支持的组件）
+          // Also try to set scrollTop directly (for components that support it)
+          const targetScroll = scrollPercentage * (editorContainer.scrollHeight - editorContainer.clientHeight);
+          editorContainer.scrollTop = targetScroll;
+        }
+
+        // 在下一帧绘制完成后重置同步标志，确保程序化滚动事件已分发
+        // Reset sync flag after the next frame is painted, ensuring programmatic scroll events have dispatched
+        requestAnimationFrame(() => {
+          isSyncingRef.current = false;
+        });
+      });
     },
     [enabled, editorContainerRef]
   );
