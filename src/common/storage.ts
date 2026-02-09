@@ -196,6 +196,22 @@ export type TChatConversation =
         }
       >,
       'model'
+    >
+  | Omit<
+      IChatConversation<
+        'task',
+        {
+          workspace?: string;
+          customWorkspace?: boolean;
+          /** Shell to use for command execution */
+          shell?: string;
+          /** Environment variables to inject */
+          env?: Record<string, string>;
+          /** Maximum execution time in ms */
+          timeout?: number;
+        }
+      >,
+      'model'
     >;
 
 export type IChatConversationRefer = {
