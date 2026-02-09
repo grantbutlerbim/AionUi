@@ -209,6 +209,12 @@ export const openclawConversation = {
   responseStream: bridge.buildEmitter<IResponseMessage>('openclaw.response.stream'),
 };
 
+// Task 对话相关接口 - 复用统一的conversation接口
+export const taskConversation = {
+  sendMessage: conversation.sendMessage,
+  responseStream: conversation.responseStream,
+};
+
 // Database operations
 export const database = {
   getConversationMessages: bridge.buildProvider<import('@/common/chatLib').TMessage[], { conversation_id: string; page?: number; pageSize?: number }>('database.get-conversation-messages'),
@@ -353,7 +359,7 @@ export interface IConfirmMessageParams {
 }
 
 export interface ICreateConversationParams {
-  type: 'gemini' | 'acp' | 'codex' | 'openclaw-gateway';
+  type: 'gemini' | 'acp' | 'codex' | 'openclaw-gateway' | 'task';
   id?: string;
   name?: string;
   model: TProviderWithModel;
@@ -381,6 +387,12 @@ export interface ICreateConversationParams {
     presetContext?: string;
     /** 预设助手 ID，用于在会话面板显示助手名称和头像 / Preset assistant ID for displaying name and avatar in conversation panel */
     presetAssistantId?: string;
+    /** Shell to use for task agent command execution */
+    shell?: string;
+    /** Environment variables to inject for task agent */
+    env?: Record<string, string>;
+    /** Maximum execution time in ms for task agent */
+    timeout?: number;
   };
 }
 interface IResetConversationParams {
