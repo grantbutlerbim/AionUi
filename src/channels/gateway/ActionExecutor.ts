@@ -16,6 +16,8 @@ import { getChannelMessageService } from '../agent/ChannelMessageService';
 import type { SessionManager } from '../core/SessionManager';
 import type { PairingService } from '../pairing/PairingService';
 import type { PluginMessageHandler } from '../plugins/BasePlugin';
+import { htmlToDiscordMarkdown } from '../plugins/discord/DiscordAdapter';
+import { createErrorRecoveryComponents, createMainMenuComponents, createResponseActionsComponents, createToolConfirmationComponents } from '../plugins/discord/DiscordComponents';
 import { createMainMenuCard, createErrorRecoveryCard, createResponseActionsCard, createToolConfirmationCard } from '../plugins/lark/LarkCards';
 import { convertHtmlToLarkMarkdown } from '../plugins/lark/LarkAdapter';
 import { createMainMenuKeyboard, createResponseActionsKeyboard, createToolConfirmationKeyboard } from '../plugins/telegram/TelegramKeyboards';
@@ -32,6 +34,9 @@ function getMainMenuMarkup(platform: PluginType) {
   if (platform === 'lark') {
     return createMainMenuCard();
   }
+  if (platform === 'discord') {
+    return createMainMenuComponents();
+  }
   return createMainMenuKeyboard();
 }
 
@@ -41,6 +46,9 @@ function getMainMenuMarkup(platform: PluginType) {
 function getResponseActionsMarkup(platform: PluginType, text?: string) {
   if (platform === 'lark') {
     return createResponseActionsCard(text || '');
+  }
+  if (platform === 'discord') {
+    return createResponseActionsComponents();
   }
   return createResponseActionsKeyboard();
 }
@@ -52,6 +60,9 @@ function getToolConfirmationMarkup(platform: PluginType, callId: string, options
   if (platform === 'lark') {
     return createToolConfirmationCard(callId, title || 'Confirmation', description || 'Please confirm', options);
   }
+  if (platform === 'discord') {
+    return createToolConfirmationComponents(callId, options);
+  }
   return createToolConfirmationKeyboard(callId, options);
 }
 
@@ -62,6 +73,9 @@ function getErrorRecoveryMarkup(platform: PluginType, errorMessage?: string) {
   if (platform === 'lark') {
     return createErrorRecoveryCard(errorMessage);
   }
+  if (platform === 'discord') {
+    return createErrorRecoveryComponents();
+  }
   return createMainMenuKeyboard(); // Telegram uses main menu for recovery
 }
 
@@ -71,6 +85,9 @@ function getErrorRecoveryMarkup(platform: PluginType, errorMessage?: string) {
 function formatTextForPlatform(text: string, platform: PluginType): string {
   if (platform === 'lark') {
     return convertHtmlToLarkMarkdown(text);
+  }
+  if (platform === 'discord') {
+    return htmlToDiscordMarkdown(text);
   }
   return escapeHtml(text);
 }

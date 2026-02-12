@@ -9,6 +9,7 @@ import { getChannelMessageService } from '../agent/ChannelMessageService';
 import { ActionExecutor } from '../gateway/ActionExecutor';
 import { PluginManager, registerPlugin } from '../gateway/PluginManager';
 import { PairingService } from '../pairing/PairingService';
+import { DiscordPlugin } from '../plugins/discord/DiscordPlugin';
 import { LarkPlugin } from '../plugins/lark/LarkPlugin';
 import { TelegramPlugin } from '../plugins/telegram/TelegramPlugin';
 import type { IChannelPluginConfig, PluginType } from '../types';
@@ -45,6 +46,7 @@ export class ChannelManager {
     // Register available plugins
     registerPlugin('telegram', TelegramPlugin);
     registerPlugin('lark', LarkPlugin);
+    registerPlugin('discord', DiscordPlugin);
   }
 
   /**
@@ -233,6 +235,11 @@ export class ChannelManager {
       if (appId && appSecret) {
         credentials = { appId, appSecret, encryptKey, verificationToken };
       }
+    } else if (pluginType === 'discord') {
+      const token = config.token as string | undefined;
+      if (token) {
+        credentials = { token };
+      }
     }
 
     const pluginConfig: IChannelPluginConfig = {
@@ -313,6 +320,15 @@ export class ChannelManager {
       return {
         success: result.success,
         botUsername: result.botInfo?.name,
+        error: result.error,
+      };
+    }
+
+    if (pluginType === 'discord') {
+      const result = await DiscordPlugin.testConnection(token);
+      return {
+        success: result.success,
+        botUsername: result.botInfo?.username,
         error: result.error,
       };
     }

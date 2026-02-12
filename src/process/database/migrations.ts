@@ -596,12 +596,154 @@ const migration_v12: IMigration = {
 };
 
 /**
+ * Migration v12 -> v13: Add 'discord' to conversations source CHECK constraint
+ */
+const migration_v13: IMigration = {
+  version: 13,
+  name: 'Add discord to conversations source constraint',
+  up: (db) => {
+    // Clean up any invalid source values before copying
+    db.exec(`
+      UPDATE conversations SET source = NULL WHERE source IS NOT NULL AND source NOT IN ('aionui', 'telegram', 'lark', 'discord');
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS conversations_new (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('gemini', 'acp', 'codex', 'openclaw-gateway')),
+        extra TEXT NOT NULL,
+        model TEXT,
+        status TEXT CHECK(status IN ('pending', 'running', 'finished')),
+        source TEXT CHECK(source IS NULL OR source IN ('aionui', 'telegram', 'lark', 'discord')),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      INSERT INTO conversations_new (id, user_id, name, type, extra, model, status, source, created_at, updated_at)
+      SELECT id, user_id, name, type, extra, model, status, source, created_at, updated_at FROM conversations;
+
+      DROP TABLE conversations;
+      ALTER TABLE conversations_new RENAME TO conversations;
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at);
+      CREATE INDEX IF NOT EXISTS idx_conversations_type ON conversations(type);
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source);
+      CREATE INDEX IF NOT EXISTS idx_conversations_source_updated ON conversations(source, updated_at DESC);
+    `);
+
+    console.log('[Migration v13] Added discord to conversations source constraint');
+  },
+  down: (db) => {
+    db.exec(`
+      UPDATE conversations SET source = NULL WHERE source = 'discord';
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS conversations_rollback (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('gemini', 'acp', 'codex', 'openclaw-gateway')),
+        extra TEXT NOT NULL,
+        model TEXT,
+        status TEXT CHECK(status IN ('pending', 'running', 'finished')),
+        source TEXT CHECK(source IS NULL OR source IN ('aionui', 'telegram', 'lark')),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      INSERT INTO conversations_rollback (id, user_id, name, type, extra, model, status, source, created_at, updated_at)
+      SELECT id, user_id, name, type, extra, model, status, source, created_at, updated_at FROM conversations;
+
+      DROP TABLE conversations;
+      ALTER TABLE conversations_rollback RENAME TO conversations;
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at);
+      CREATE INDEX IF NOT EXISTS idx_conversations_type ON conversations(type);
+      CREATE INDEX IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_conversations_source ON conversations(source);
+      CREATE INDEX IF NOT EXISTS idx_conversations_source_updated ON conversations(source, updated_at DESC);
+    `);
+
+    console.log('[Migration v13] Rolled back: Removed discord from conversations source constraint');
+  },
+};
+
+/**
+ * Migration v13 -> v14: Add 'openclaw-gateway' to assistant_sessions agent_type CHECK constraint
+ */
+const migration_v14: IMigration = {
+  version: 14,
+  name: 'Add openclaw-gateway to assistant_sessions agent_type constraint',
+  up: (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS assistant_sessions_new (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        agent_type TEXT NOT NULL CHECK(agent_type IN ('gemini', 'acp', 'codex', 'openclaw-gateway')),
+        conversation_id TEXT,
+        workspace TEXT,
+        created_at INTEGER NOT NULL,
+        last_activity INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES assistant_users(id) ON DELETE CASCADE,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+      );
+
+      INSERT OR IGNORE INTO assistant_sessions_new SELECT * FROM assistant_sessions;
+
+      DROP TABLE IF EXISTS assistant_sessions;
+
+      ALTER TABLE assistant_sessions_new RENAME TO assistant_sessions;
+
+      CREATE INDEX IF NOT EXISTS idx_assistant_sessions_user ON assistant_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_assistant_sessions_conversation ON assistant_sessions(conversation_id);
+    `);
+
+    console.log('[Migration v14] Added openclaw-gateway to assistant_sessions agent_type constraint');
+  },
+  down: (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS assistant_sessions_old (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        agent_type TEXT NOT NULL CHECK(agent_type IN ('gemini', 'acp', 'codex')),
+        conversation_id TEXT,
+        workspace TEXT,
+        created_at INTEGER NOT NULL,
+        last_activity INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES assistant_users(id) ON DELETE CASCADE,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+      );
+
+      INSERT OR IGNORE INTO assistant_sessions_old SELECT * FROM assistant_sessions WHERE agent_type != 'openclaw-gateway';
+
+      DROP TABLE IF EXISTS assistant_sessions;
+
+      ALTER TABLE assistant_sessions_old RENAME TO assistant_sessions;
+
+      CREATE INDEX IF NOT EXISTS idx_assistant_sessions_user ON assistant_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_assistant_sessions_conversation ON assistant_sessions(conversation_id);
+    `);
+
+    console.log('[Migration v14] Rolled back: Removed openclaw-gateway from assistant_sessions agent_type constraint');
+  },
+};
+
+/**
  * All migrations in order
  */
 // prettier-ignore
 export const ALL_MIGRATIONS: IMigration[] = [
   migration_v1, migration_v2, migration_v3, migration_v4, migration_v5, migration_v6,
   migration_v7, migration_v8, migration_v9, migration_v10, migration_v11, migration_v12,
+  migration_v13, migration_v14,
 ];
 
 /**

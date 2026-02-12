@@ -106,7 +106,7 @@ export interface IChannelUserRow {
 /**
  * Agent types supported in assistant sessions
  */
-export type ChannelAgentType = 'gemini' | 'acp' | 'codex';
+export type ChannelAgentType = 'gemini' | 'acp' | 'codex' | 'openclaw-gateway';
 
 /**
  * User session in the assistant system
@@ -439,13 +439,13 @@ export function pairingRequestToRow(request: IChannelPairingRequest): IChannelPa
  * Channel platform type for model configuration.
  * Subset of PluginType that currently supports channel conversations.
  */
-export type ChannelPlatform = 'telegram' | 'lark';
+export type ChannelPlatform = 'telegram' | 'lark' | 'discord';
 
 /**
  * Type guard to check if a string is a valid ChannelPlatform
  */
 export function isChannelPlatform(value: string): value is ChannelPlatform {
-  return value === 'telegram' || value === 'lark';
+  return value === 'telegram' || value === 'lark' || value === 'discord';
 }
 
 /**
@@ -455,6 +455,7 @@ export function getChannelConversationName(platform: ChannelPlatform): string {
   const names: Record<ChannelPlatform, string> = {
     telegram: 'Telegram Assistant',
     lark: 'Lark Assistant',
+    discord: 'Discord Assistant',
   };
   return names[platform];
 }
