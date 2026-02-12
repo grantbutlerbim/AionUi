@@ -22,7 +22,8 @@ import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { handlePreviewOpenEvent } from '../utils/previewUtils';
 import BaseAgentManager from './BaseAgentManager';
 import { hasCronCommands } from './CronCommandDetector';
-import { extractTextFromMessage, processCronInMessage } from './MessageMiddleware';
+import { hasTaskCommands } from './TaskCommandDetector';
+import { extractTextFromMessage, processCronInMessage, processTaskInMessage } from './MessageMiddleware';
 import { stripThinkTags } from './ThinkTagDetector';
 
 // gemini agent管理器类
@@ -475,21 +476,38 @@ export class GeminiAgentManager extends BaseAgentManager<
       const latestMsg = assistantMsgs[0];
       const textContent = extractTextFromMessage(latestMsg);
 
-      if (textContent && hasCronCommands(textContent)) {
+      if (textContent && (hasCronCommands(textContent) || hasTaskCommands(textContent))) {
         // Create a message with finish status for middleware
         const msgWithStatus = { ...latestMsg, status: 'finish' as const };
         // Collect system responses to send back to AI
         const collectedResponses: string[] = [];
-        await processCronInMessage(this.conversation_id, 'gemini', msgWithStatus, (sysMsg) => {
-          collectedResponses.push(sysMsg);
-          // Also emit to frontend for display
-          ipcBridge.geminiConversation.responseStream.emit({
-            type: 'system',
-            conversation_id: this.conversation_id,
-            msg_id: uuid(),
-            data: sysMsg,
+
+        // Process cron commands
+        if (hasCronCommands(textContent)) {
+          await processCronInMessage(this.conversation_id, 'gemini', msgWithStatus, (sysMsg) => {
+            collectedResponses.push(sysMsg);
+            ipcBridge.geminiConversation.responseStream.emit({
+              type: 'system',
+              conversation_id: this.conversation_id,
+              msg_id: uuid(),
+              data: sysMsg,
+            });
           });
-        });
+        }
+
+        // Process task commands
+        if (hasTaskCommands(textContent)) {
+          await processTaskInMessage(this.conversation_id, 'gemini', msgWithStatus, (sysMsg) => {
+            collectedResponses.push(sysMsg);
+            ipcBridge.geminiConversation.responseStream.emit({
+              type: 'system',
+              conversation_id: this.conversation_id,
+              msg_id: uuid(),
+              data: sysMsg,
+            });
+          });
+        }
+
         // Send collected responses back to AI agent so it can continue
         if (collectedResponses.length > 0) {
           const feedbackMessage = `[System Response]\n${collectedResponses.join('\n')}`;

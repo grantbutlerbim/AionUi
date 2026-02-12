@@ -10,7 +10,8 @@ import type { CodexEventMsg } from '@/common/codex/types';
 import type { ICodexMessageEmitter } from '@/agent/codex/messaging/CodexMessageEmitter';
 import { ERROR_CODES, globalErrorService } from '@/agent/codex/core/ErrorService';
 import { hasCronCommands } from '@process/task/CronCommandDetector';
-import { processCronInMessage } from '@process/task/MessageMiddleware';
+import { hasTaskCommands } from '@process/task/TaskCommandDetector';
+import { processCronInMessage, processTaskInMessage } from '@process/task/MessageMiddleware';
 import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { ipcBridge } from '@/common';
 
@@ -114,19 +115,29 @@ export class CodexMessageProcessor {
     // This is the reliable point to detect cron commands since we have the complete message text
     const messageText = msg.message || '';
 
-    if (hasCronCommands(messageText)) {
+    if (hasCronCommands(messageText) || hasTaskCommands(messageText)) {
       // Collect system responses to send back to AI
       const collectedResponses: string[] = [];
-      void processCronInMessage(this.conversation_id, 'codex', transformedMessage, (sysMsg) => {
+      const emitSysMsg = (sysMsg: string) => {
         collectedResponses.push(sysMsg);
-        // Also emit to frontend for display
         ipcBridge.codexConversation.responseStream.emit({
           type: 'system',
           conversation_id: this.conversation_id,
           msg_id: uuid(),
           data: sysMsg,
         });
-      }).then(() => {
+      };
+
+      const processAll = async () => {
+        if (hasCronCommands(messageText)) {
+          await processCronInMessage(this.conversation_id, 'codex', transformedMessage, emitSysMsg);
+        }
+        if (hasTaskCommands(messageText)) {
+          await processTaskInMessage(this.conversation_id, 'codex', transformedMessage, emitSysMsg);
+        }
+      };
+
+      void processAll().then(() => {
         // Send collected responses back to AI agent so it can continue
         if (collectedResponses.length > 0 && this.messageEmitter.sendMessageToAgent) {
           const feedbackMessage = `[System Response]\n${collectedResponses.join('\n')}`;

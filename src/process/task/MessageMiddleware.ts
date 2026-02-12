@@ -9,7 +9,10 @@ import { ipcBridge } from '@/common';
 import type { AcpBackendAll } from '@/types/acpTypes';
 import { cronService } from '@process/services/cron/CronService';
 import { detectCronCommands, stripCronCommands, type CronCommand } from './CronCommandDetector';
+import { detectTaskCommands, stripTaskCommands, type TaskCommand } from './TaskCommandDetector';
 import { hasThinkTags, stripThinkTags } from './ThinkTagDetector';
+import { spawn } from 'child_process';
+import WorkerManage from '../WorkerManage';
 
 /**
  * Result of processing an agent response
@@ -70,6 +73,17 @@ export async function processAgentResponse(conversationId: string, agentType: Ac
 
     // Strip cron commands from display
     displayContent = stripCronCommands(displayContent);
+    needsDisplayMessage = true;
+  }
+
+  // Detect task commands
+  const taskCommands = detectTaskCommands(displayContent);
+  if (taskCommands.length > 0) {
+    const responses = await handleTaskCommands(conversationId, taskCommands);
+    systemResponses.push(...responses);
+
+    // Strip task commands from display
+    displayContent = stripTaskCommands(displayContent);
     needsDisplayMessage = true;
   }
 
@@ -174,6 +188,105 @@ export async function processCronInMessage(conversationId: string, agentType: Ac
   } catch {
     // Silently handle errors
   }
+}
+
+/**
+ * Process task commands in a message and emit system responses
+ * High-level helper similar to processCronInMessage
+ *
+ * @param conversationId - The conversation ID
+ * @param _agentType - The agent type
+ * @param message - The completed message to check for task commands
+ * @param emitSystemResponse - Callback to emit system response messages
+ */
+export async function processTaskInMessage(conversationId: string, _agentType: AcpBackendAll, message: TMessage, emitSystemResponse: (response: string) => void): Promise<void> {
+  try {
+    const textContent = extractTextFromMessage(message);
+    if (!textContent) return;
+
+    const taskCommands = detectTaskCommands(textContent);
+    if (taskCommands.length === 0) return;
+
+    const responses = await handleTaskCommands(conversationId, taskCommands);
+    for (const sysMsg of responses) {
+      emitSystemResponse(sysMsg);
+    }
+  } catch {
+    // Silently handle errors
+  }
+}
+
+/**
+ * Execute a shell command and capture output
+ */
+function executeCommand(command: string, workingDir: string, timeoutMs: number): Promise<{ success: boolean; output: string; exitCode: number | null }> {
+  return new Promise((resolve) => {
+    const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+    const shellArgs = process.platform === 'win32' ? ['/c', command] : ['-c', command];
+
+    const child = spawn(shell, shellArgs, {
+      cwd: workingDir,
+      env: process.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: timeoutMs,
+    });
+
+    let output = '';
+
+    child.stdout?.on('data', (data: Buffer) => {
+      output += data.toString();
+    });
+
+    child.stderr?.on('data', (data: Buffer) => {
+      output += data.toString();
+    });
+
+    child.on('error', (error: Error) => {
+      resolve({ success: false, output: `Error: ${error.message}`, exitCode: null });
+    });
+
+    child.on('exit', (code: number | null) => {
+      resolve({ success: code === 0, output, exitCode: code });
+    });
+  });
+}
+
+/**
+ * Handle detected task commands
+ */
+async function handleTaskCommands(conversationId: string, commands: TaskCommand[]): Promise<string[]> {
+  const responses: string[] = [];
+
+  // Get workspace from the running task
+  const task = WorkerManage.getTaskById(conversationId);
+  const defaultWorkspace = task?.workspace || process.cwd();
+
+  for (const cmd of commands) {
+    try {
+      const workingDir = cmd.workingDir || defaultWorkspace;
+      const timeoutMs = (cmd.timeout || 300) * 1000;
+
+      const result = await executeCommand(cmd.command, workingDir, timeoutMs);
+
+      // Truncate very long output
+      const maxOutputLen = 8000;
+      let output = result.output.trim();
+      if (output.length > maxOutputLen) {
+        output = output.slice(0, maxOutputLen) + `\n... (truncated, ${result.output.length} total characters)`;
+      }
+
+      if (result.success) {
+        responses.push(`[Task Result - exit code: 0]\n${output || '(no output)'}`);
+      } else {
+        responses.push(`[Task Result - exit code: ${result.exitCode}]\n${output || '(no output)'}`);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      responses.push(`[Task Error] ${errorMsg}`);
+    }
+  }
+
+  return responses;
 }
 
 /**

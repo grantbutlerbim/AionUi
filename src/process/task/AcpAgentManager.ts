@@ -15,7 +15,8 @@ import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { prepareFirstMessageWithSkillsIndex } from './agentUtils';
 import BaseAgentManager from './BaseAgentManager';
 import { hasCronCommands } from './CronCommandDetector';
-import { extractTextFromMessage, processCronInMessage } from './MessageMiddleware';
+import { hasTaskCommands } from './TaskCommandDetector';
+import { extractTextFromMessage, processCronInMessage, processTaskInMessage } from './MessageMiddleware';
 import { stripThinkTags } from './ThinkTagDetector';
 
 interface AcpAgentManagerData {
@@ -187,9 +188,9 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
             cronBusyGuard.setProcessing(this.conversation_id, false);
           }
 
-          // Process cron commands when turn ends (finish signal)
+          // Process cron and task commands when turn ends (finish signal)
           // ACP streams content in chunks, so we check the accumulated content here
-          if (v.type === 'finish' && this.currentMsgContent && hasCronCommands(this.currentMsgContent)) {
+          if (v.type === 'finish' && this.currentMsgContent && (hasCronCommands(this.currentMsgContent) || hasTaskCommands(this.currentMsgContent))) {
             const message: TMessage = {
               id: this.currentMsgId || uuid(),
               msg_id: this.currentMsgId || uuid(),
@@ -200,11 +201,9 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
               status: 'finish',
               createdAt: Date.now(),
             };
-            // Process cron commands and send results back to AI
             const collectedResponses: string[] = [];
-            await processCronInMessage(this.conversation_id, data.backend as any, message, (sysMsg) => {
+            const emitSysMsg = (sysMsg: string) => {
               collectedResponses.push(sysMsg);
-              // Also emit to frontend for display
               const systemMessage: IResponseMessage = {
                 type: 'system',
                 conversation_id: this.conversation_id,
@@ -212,7 +211,18 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
                 data: sysMsg,
               };
               ipcBridge.acpConversation.responseStream.emit(systemMessage);
-            });
+            };
+
+            // Process cron commands
+            if (hasCronCommands(this.currentMsgContent)) {
+              await processCronInMessage(this.conversation_id, data.backend as any, message, emitSysMsg);
+            }
+
+            // Process task commands
+            if (hasTaskCommands(this.currentMsgContent)) {
+              await processTaskInMessage(this.conversation_id, data.backend as any, message, emitSysMsg);
+            }
+
             // Send collected responses back to AI agent so it can continue
             if (collectedResponses.length > 0 && this.agent) {
               const feedbackMessage = `[System Response]\n${collectedResponses.join('\n')}`;
