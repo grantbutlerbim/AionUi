@@ -154,6 +154,15 @@
     "pptOpenFile": "Dosyayı Aç",
     "pptShowLocation": "Konumu Göster",
     "pptSystemAppHint": "Varsayılan sistem uygulamasıyla açılacaktır (PowerPoint, Keynote veya WPS)",
+    "ppt": {
+      "loading": "Sunum yükleniyor...",
+      "slideLabel": "Slayt {{number}}",
+      "slideCount": "{{count}} slayt",
+      "noContent": "Bu slaytta metin içeriği yok",
+      "noSlides": "Bu sunumda slayt bulunamadı",
+      "convertFailed": "Sunum dönüştürme başarısız",
+      "loadFailed": "Sunum yükleme başarısız"
+    },
     "openWithApp": "{{app}} ile Aç",
     "openInSystemApp": "Sistem uygulamasında aç",
     "openInSystemSuccess": "Sistem varsayılan uygulamasında açıldı",

@@ -147,6 +147,15 @@
     "pptOpenFile": "파일 열기",
     "pptShowLocation": "위치 표시",
     "pptSystemAppHint": "기본 시스템 앱(PowerPoint, Keynote 또는 WPS)으로 열립니다",
+    "ppt": {
+      "loading": "프레젠테이션 로딩 중...",
+      "slideLabel": "슬라이드 {{number}}",
+      "slideCount": "{{count}}개 슬라이드",
+      "noContent": "이 슬라이드에 텍스트 콘텐츠가 없습니다",
+      "noSlides": "슬라이드를 찾을 수 없습니다",
+      "convertFailed": "프레젠테이션 변환 실패",
+      "loadFailed": "프레젠테이션 로드 실패"
+    },
     "openWithApp": "{{app}}에서 열기",
     "openInSystemApp": "시스템 앱에서 열기",
     "openInSystemSuccess": "시스템 기본 앱에서 열렸습니다",

@@ -245,6 +245,15 @@
     "pptOpenFile": "開啟檔案",
     "pptShowLocation": "顯示位置",
     "pptSystemAppHint": "將使用 PowerPoint、Keynote 或 WPS 等系統預設應用開啟",
+    "ppt": {
+      "loading": "正在載入簡報...",
+      "slideLabel": "第 {{number}} 張投影片",
+      "slideCount": "共 {{count}} 張投影片",
+      "noContent": "此投影片沒有文字內容",
+      "noSlides": "此簡報中未找到投影片",
+      "convertFailed": "簡報轉換失敗",
+      "loadFailed": "載入簡報失敗"
+    },
     "openWithApp": "在 {{app}} 中開啟",
     "openInSystemApp": "使用系統預設應用開啟",
     "openInSystemSuccess": "已在系統預設應用中開啟",
