@@ -1,0 +1,19 @@
+project_id = "local-opportunity-engine"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+
+[functions.score-property]
+verify_jwt = true
