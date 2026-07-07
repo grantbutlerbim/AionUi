@@ -9,6 +9,27 @@ high-ticket home-service opportunities (MVP: patio covers).
 - Supabase (Postgres + Auth + Storage + Edge Functions) (`supabase/`)
 - AI scoring via Anthropic Claude (vision), run as a Supabase Edge Function
 
+## Data sources
+
+**Property CSV (step 1 of the workflow):** for a Houston-area pilot, don't pay
+for RentCast/ATTOM/First American to start. Harris County Appraisal District
+(HCAD) publishes free bulk property/sales data — owner, address, sale date,
+sale price, sqft, year built — for every parcel in the county, and Fort Bend /
+Montgomery / Brazoria appraisal districts publish the same for the suburbs.
+Export/reshape that into the CSV columns this app expects
+(`address, city, state, zip, sale_date, sale_price, beds, baths, sqft,
+year_built`) and skip the paid API entirely for an MVP.
+
+**Photos (step 2, "attach exterior/backyard/aerial image URLs"):** this app
+intentionally does *not* auto-pull Google Street View imagery. Google Maps
+Platform's terms restrict redistributing/reselling Street View imagery to
+third parties, which is exactly what "hand the contractor a photo" would be.
+The safe pattern: score the property from the CSV data (and any photos *you*
+have the rights to attach), and let the AI-generated text output — detected
+issue, recommended service, postcard copy — be the thing you sell. If a
+contractor wants to see the property, they pull up Street View themselves
+during their own sales call.
+
 ## Setup
 
 1. Create a Supabase project.
